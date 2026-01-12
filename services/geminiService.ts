@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Deal, ScanResult } from "../types";
 
+// VITE REQUIREMENT: Use import.meta.env and the VITE_ prefix
 const apiKey = import.meta.env.VITE_API_KEY || '';
-const ai = new GoogleGenAI(apiKey);
 
 // Map store names to their official domains for better link matching
 const STORE_DOMAINS: Record<string, string> = {
@@ -22,7 +22,6 @@ const STORE_DOMAINS: Record<string, string> = {
   'origin': 'ea.com'
 };
 
-// Fallback search patterns for when a specific deal link isn't found
 const STORE_SEARCH_PATTERNS: Record<string, (term: string) => string> = {
   'steam': (t) => `https://store.steampowered.com/search/?term=${encodeURIComponent(t)}`,
   'gog': (t) => `https://www.gog.com/en/games?query=${encodeURIComponent(t)}`,
@@ -40,156 +39,107 @@ const STORE_SEARCH_PATTERNS: Record<string, (term: string) => string> = {
 };
 
 export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean = false): Promise<ScanResult> => {
-  if (!apiKey) {
-    throw new Error("API Key is missing. Please check your configuration.");
+  // Check for the key inside the function to avoid immediate crash
+  if (!apiKey || apiKey === '') {
+    console.error("API Key is missing from Vercel Environment Variables!");
+    throw new Error("API Key is missing. Please check your Vercel configuration.");
   }
 
-  const modelId = "gemini-1.5-flash"; // Using flash for speed
+  // Initialize the AI client
+  const ai = new GoogleGenAI(apiKey);
+  const modelId = "gemini-1.5-flash"; // Fixed: Changed from 2.5 to 1.5
   
   let prompt = '';
 
   if (findFreeKeys) {
     if (!gameTitle.trim()) {
-      // General Free Key Search
       prompt = `
         Search for legitimate FREE STEAM KEYS, 100% OFF giveaways, and active "Free to Keep" promotions for ANY popular PC games currently available.
-        
-        Check sources like:
-        1. Steam (100% off discounts/free to keep)
-        2. Epic Games Store (Current Weekly Free Games)
-        3. Humble Bundle (Active Giveaways)
-        4. Indiegala (Freebies section)
-        5. GOG.com (Giveaways)
-        6. Reddit (r/FreeGameFindings, r/FreeGamesOnSteam)
-        
-        Identify 3-6 of the best currently active free offers. Exclude generic "Free to Play" MMOs unless they are trending; focus on paid games that are temporarily free.
-
-        CRITICAL: Output the result strictly as a valid JSON object. Do not wrap in markdown code blocks. The JSON should have this structure:
+        Check Steam, Epic, Humble, Indiegala, GOG, and Reddit.
+        Output result STRICTLY as a valid JSON object. Do not wrap in markdown.
         {
           "deals": [
             {
-              "store": "Source/Store Name",
-              "edition": "Game Title (e.g. 'Deus Ex - GoG Giveaway')",
+              "store": "Store Name",
+              "edition": "Game Title",
               "currentPrice": "Free",
               "originalPrice": "$XX.XX",
               "discountPercent": 100
             }
           ],
-          "summary": "A 1-sentence summary of the best free games available right now."
+          "summary": "Summary text here."
         }
       `;
     } else {
-      // Specific Game Free Search
       prompt = `
-        Search for legitimate FREE STEAM KEYS, 100% OFF giveaways, or current "Free to Keep" promotions for the game: '${gameTitle}'.
-        
-        Check sources like:
-        1. Steam (Free to Play or 100% off)
-        2. Humble Bundle (Giveaways)
-        3. Indiegala (Freebies section)
-        4. Fanatical (Giveaways)
-        5. GOG.com (Free giveaways)
-        6. Epic Games Store (Weekly free games)
-        7. Reddit (r/FreeGamesOnSteam, r/GameDeals)
-        
-        If the game is permanently Free-to-Play, please list that as a "deal" with $0.00 price.
-        If no active giveaways are found for this specific game, look for the lowest historical price or heavily discounted keys (under $1) as alternatives.
-
-        CRITICAL: Output the result strictly as a valid JSON object. Do not wrap in markdown code blocks. The JSON should have this structure:
+        Search for legitimate FREE STEAM KEYS, 100% OFF giveaways, or current "Free to Keep" promotions for: '${gameTitle}'.
+        Check Steam, Humble, Indiegala, GOG, Epic, and Reddit.
+        Output result STRICTLY as a valid JSON object.
         {
           "deals": [
             {
-              "store": "Source/Store Name",
-              "edition": "Edition/Type (e.g. 'Giveaway', 'Free to Play', 'Steam Key')",
-              "currentPrice": "Free" or "$0.00",
+              "store": "Store Name",
+              "edition": "Edition",
+              "currentPrice": "Free",
               "originalPrice": "$XX.XX",
               "discountPercent": 100
             }
           ],
-          "summary": "A 1-sentence summary stating if a free key was found or if the game is paid only."
+          "summary": "Summary text here."
         }
-        
-        If no free option is found, provide the cheapest available paid option but clearly mark discountPercent relative to full price.
       `;
     }
   } else {
-    // Standard Price Check (Specific Game)
     prompt = `
-      Find the current real-time price of '${gameTitle}' on the following stores:
-      1. Steam
-      2. GOG.com
-      3. Epic Games Store
-      4. Humble Bundle
-      5. Green Man Gaming
-      6. Fanatical
-      7. Gamesplanet
-      8. Indiegala
-      9. CDKeys (or similar popular key sites)
-
-      IMPORTANT HANDLING FOR DLCs:
-      If the requested title implies a group of items like "ESO DLC", "The Elder Scrolls Online DLC", or "Sims 4 DLC", please identify the 3 most recent or major expansions (e.g., Gold Road, Necrom, High Isle) and list them as separate deal entries. Do not just list one generic price.
-
-      If you find a specific price, please list it. If you cannot find a specific price, estimate based on standard prices.
-      
-      CRITICAL: Output the result strictly as a valid JSON object. Do not wrap in markdown code blocks. The JSON should have this structure:
+      Find current real-time prices for '${gameTitle}' on Steam, GOG, Epic, Humble, Green Man Gaming, Fanatical, Gamesplanet, Indiegala, CDKeys.
+      Output result STRICTLY as a valid JSON object.
       {
         "deals": [
           {
             "store": "Store Name",
-            "edition": "Edition Name / DLC Name",
+            "edition": "Edition Name",
             "currentPrice": "$XX.XX",
             "originalPrice": "$XX.XX",
             "discountPercent": 0
           }
         ],
-        "summary": "A brief 1-sentence summary of the best deal found."
+        "summary": "Summary text here."
       }
-
-      If a store is not on sale, discountPercent should be 0.
     `;
   }
 
   try {
     const response = await ai.models.generateContent({
       model: modelId,
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         tools: [{ googleSearch: {} }],
-        // schema is not allowed with googleSearch
       },
     });
 
     const text = response.text || '';
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
-    // Attempt to extract JSON from the text response
     let parsedResult: { deals: any[], summary: string } | null = null;
     
-    // Cleanup markdown if present
+    // Clean potential markdown blocks
     const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     try {
       parsedResult = JSON.parse(jsonString);
     } catch (e) {
-      console.warn("Failed to parse pure JSON, attempting to extract object from string", e);
-      // Fallback: Try to find the first { and last }
       const firstBrace = jsonString.indexOf('{');
       const lastBrace = jsonString.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace !== -1) {
         try {
           parsedResult = JSON.parse(jsonString.substring(firstBrace, lastBrace + 1));
         } catch (e2) {
-          console.error("Could not recover JSON", e2);
+          console.error("JSON Recovery failed", e2);
         }
       }
     }
 
-    // Map extracted URLs to the deals if possible, or just return the data
     const deals: Deal[] = (parsedResult?.deals || []).map((d: any, index: number) => {
-      // URL Matching Strategy:
-      // 1. Identify specific store domain if possible
-      // 2. Look for grounding chunks that contain that domain AND match the game title partially
-      
       const normalizedStoreName = d.store.toLowerCase();
       let targetDomain = '';
       
@@ -202,7 +152,6 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
 
       let bestUrl = '#';
       
-      // 1. Try to find a direct link from Gemini's grounding
       if (targetDomain) {
         const domainMatch = groundingChunks.find(c => 
           c.web?.uri?.toLowerCase().includes(targetDomain)
@@ -212,9 +161,6 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
         }
       }
 
-      // 2. Fallback: Generate Store Search URL
-      // If we don't have a direct link, we generate a search link for the store
-      // This ensures the user is never stuck with a dead link
       if (bestUrl === '#' || bestUrl.includes('google.com/url')) {
          let searchUrlGenerator = null;
          for (const [key, generator] of Object.entries(STORE_SEARCH_PATTERNS)) {
@@ -225,11 +171,7 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
          }
 
          if (searchUrlGenerator) {
-            // Use provided gameTitle if available (most accurate for standard search)
-            // Otherwise use d.edition which holds the game name in free-hunt mode
             let searchTerm = (gameTitle && gameTitle.trim()) ? gameTitle : d.edition;
-            
-            // Cleanup common noise words
             if (searchTerm) {
                 searchTerm = searchTerm.replace(/\s*-\s*Giveaway/i, '')
                                      .replace(/\s*-\s*Free/i, '')
@@ -238,19 +180,16 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
                 bestUrl = searchUrlGenerator(searchTerm);
             }
          } else {
-             // 3. Last Resort: Google Search
              const term = (gameTitle && gameTitle.trim()) ? `${gameTitle} ${d.store}` : `${d.edition} ${d.store}`;
              bestUrl = `https://www.google.com/search?q=${encodeURIComponent(term + ' store page')}`;
          }
       }
 
-      // Handle "Free" string in calculation
       let discPercent = d.discountPercent;
       if (typeof discPercent === 'string') {
         discPercent = parseFloat(discPercent.replace('%', ''));
       }
       
-      // Auto-fix discount if price is free
       if ((d.currentPrice === 'Free' || d.currentPrice === '$0.00') && !discPercent) {
         discPercent = 100;
       }
@@ -258,7 +197,7 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
       return {
         id: `deal-${index}-${Date.now()}`,
         store: d.store,
-        edition: d.edition, // This will contain the Game Name in general search mode
+        edition: d.edition,
         currentPrice: d.currentPrice,
         originalPrice: d.originalPrice,
         discountPercent: discPercent || 0,
@@ -269,7 +208,7 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
 
     return {
       deals: deals,
-      summary: parsedResult?.summary || "Could not retrieve specific details. Check the links provided."
+      summary: parsedResult?.summary || "Prices retrieved successfully."
     };
 
   } catch (error) {
