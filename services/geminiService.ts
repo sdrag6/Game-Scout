@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { Deal, ScanResult } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const apiKey = import.meta.env.VITE_API_KEY || '';
+const ai = new GoogleGenAI(apiKey);
 
 // Map store names to their official domains for better link matching
 const STORE_DOMAINS: Record<string, string> = {
@@ -44,7 +44,7 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
     throw new Error("API Key is missing. Please check your configuration.");
   }
 
-  const modelId = "gemini-2.5-flash"; // Using flash for speed
+  const modelId = "gemini-1.5-flash"; // Using flash for speed
   
   let prompt = '';
 
