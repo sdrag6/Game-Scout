@@ -47,7 +47,7 @@ export const checkGamePrices = async (gameTitle: string, findFreeKeys: boolean =
 
   // Initialize the AI client
   const ai = new GoogleGenAI(apiKey);
-  const modelId = "gemini-1.5-flash"; // Fixed: Changed from 2.5 to 1.5
+  const modelId = "gemini-1.5-flash-latest"; // Fixed: Changed from 2.5 to 1.5
   
   let prompt = '';
 
