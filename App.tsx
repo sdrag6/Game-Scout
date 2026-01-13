@@ -33,8 +33,14 @@ const App: React.FC = () => {
       setDeals(result.deals);
       setSummary(result.summary);
       setLastUpdated(new Date().toLocaleTimeString());
-    } catch (err) {
-      setError("Unable to retrieve market data at this time. Please try again later. (Ensure valid API Key is set)");
+    } catch (err: any) {
+      // Improved error handling to give the user better feedback
+      if (err.message && err.message.includes("API Key")) {
+         setError("Configuration Error: API Key is missing. Please add 'API_KEY' to your Vercel Environment Variables.");
+      } else {
+         setError("Unable to retrieve market data. The service might be busy or the game title was not found.");
+      }
+      console.error(err);
     } finally {
       setLoading(false);
     }
